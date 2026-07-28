@@ -2,7 +2,7 @@
 
 تحويل فيديوهات كاميرات المطاعم والمتاجر إلى مؤشرات تشغيلية قابلة للمراجعة: كثافة العملاء داخل المناطق، طول الطابور، التنبيهات، ومسارات الحركة داخل كل كاميرا.
 
-> **حالة المشروع: MVP يعمل لكل كاميرا بصورة مستقلة.** لا توجد في النسخة الحالية مطابقة للشخص نفسه بين كاميرتين، ولا تُحسب الأرقام كعدد زوار فريد على مستوى المتجر.
+> **حالة المشروع: الـpipeline الأساسي يعمل لكل كاميرا بصورة مستقلة.** لا توجد مطابقة هوية بين كاميرتين ضمن مخرجاته أو الـDashboard، ولا تُحسب أرقامه كعدد زوار فريد على مستوى المتجر. يوجد نوتبوك بحثي منفصل باسم `02b_Global_Identity_Demo_Mode.ipynb` لا يغذي هذا المسار، وكل ناتجه معلّم صراحةً بأنه Demo.
 
 ## ما الذي نُفّذ؟
 
@@ -24,6 +24,8 @@
 | التخزين والعرض | مُنفّذ | CSV وDuckDB وتطبيق Streamlit بفلاتر المكان/الكاميرا ومسارات وSankey. |
 | سؤال عربي عن البيانات | مُنفّذ محليًا | اختياري عبر Ollama: يولّد SQL مقيدًا بـ`SELECT` على DuckDB ثم يجيب من النتيجة الفعلية فقط. |
 | Re-ID أو Global Fusion | غير مُنفّذ عمدًا | لا ربط عبر الكاميرات في هذا الـMVP. |
+| Global Identity Demo | تجريبي ومنفصل | `02b` يكتب `global_tracks_demo.csv` فقط؛ لا يستخدم ظهور الشخص وحده كهوية نهائية. |
+| عامل/زبون بمنطقة عمل | مُنفّذ بإعداد يدوي | `01b` يحسب role محليًا ويكتب ملفات وفيديوهات جديدة من دون تغيير التتبع الأصلي. |
 
 ## نتيجة آخر تشغيل محفوظ
 
@@ -64,7 +66,9 @@ Retail_Intelligence_Agent/
 ├── Notebook/
 │   ├── 00_Project_Setup.ipynb
 │   ├── 01_Local_Detection_Tracking.ipynb
+│   ├── 01b_Staff_Customer_Zones.ipynb         # اختياري؛ لا يغيّر local_tracks.csv
 │   ├── 02_Global_Fusion_and_Zones.ipynb  # الاسم تاريخي؛ تعمل محليًا لكل كاميرا
+│   ├── 02b_Global_Identity_Demo_Mode.ipynb    # بحثي/Demo؛ لا يغذي Dashboard
 │   ├── 03_Retail_Analytics_Agent.ipynb
 │   ├── 04_Streamlit_Dashboard.ipynb
 │   └── 05_Run_All.ipynb
@@ -129,6 +133,18 @@ python -m streamlit run Output\app\streamlit_app.py
 
 ثم افتح `http://localhost:8501`. لا تشغّل `streamlit_app.py` باستخدام `python` وحده.
 
+### تجارب اختيارية لا تغيّر الـpipeline
+
+- `01b_Staff_Customer_Zones.ipynb` يقرأ `Data/config/staff_zones.json`. ابدأ بالملف الفارغ الآمن، ثم حدّد polygon لمنطقة العمل لكل كاميرا باستخدام:
+
+```powershell
+python Notebook\pick_staff_zone.py CAFE_place_05_camera_17_15min
+```
+
+  الإحداثيات بكسل الكاميرا، ويظل أي track بلا polygon عاملًا كـcustomer افتراضيًا إلا لو وجد `manual_override` في `employee_local_ids.json`.
+
+- `02b_Global_Identity_Demo_Mode.ipynb` ينشئ `global_tracks_demo.csv` فقط. إذا لم توجد كاميرتان في `local_tracks.csv` فالناتج الصحيح هو صفر matches؛ لا يختلق Matches. وعند غياب calibration موثق، يعتمد Demo Mode على appearance + عدم التداخل الزمني فقط ويظل `is_demo_mode=True` في كل صف.
+
 ### 5. الاختبارات
 
 بعد تثبيت بيئة Python:
@@ -154,4 +170,3 @@ python -m pytest -q
 ## الخصوصية والاستخدام المسؤول
 
 المشروع يعتمد على تتبع مجهول داخل الكاميرا ولا يخزن وجوهًا أو أسماء أشخاص. قبل أي استخدام فعلي، التزم بقوانين الخصوصية وإشعارات الكاميرات وسياسات الاحتفاظ بالفيديو الخاصة بالموقع.
-
