@@ -42,6 +42,8 @@ class ExperimentalNotebookContractTests(unittest.TestCase):
         self.assertIn("build_global_mapping", source)
         self.assertNotIn("import mtmc_reid", source)
         self.assertNotIn("from mtmc_reid", source)
+        self.assertNotIn("spec_from_file_location", source)
+        self.assertNotIn("importlib.util", source)
 
     def test_support_scripts_compile(self) -> None:
         for name in ("mtmc_reid.py", "calibrate_homography.py", "pick_staff_zone.py"):
