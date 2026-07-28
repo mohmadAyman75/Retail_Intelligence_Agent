@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "calibration": {
+    "path": "Data/config/camera_calibration.generated.json",
+    "required_floor_units": "reference_pixels",
+    "require_all_cameras": true
+  },
+  "reid": {
+    "model_name": "osnet_ain_x1_0",
+    "weights_path": "Data/models/osnet_ain_x1_0_msmt17_256x128_amsgrad_ep50_lr0.0015_coslr_b64_fb10_softmax_labsmth_flip_jitter.pth",
+    "device": "auto",
+    "batch_size": 32,
+    "samples_per_tracklet": 12,
+    "min_confidence": 0.25,
+    "min_box_area": 1024.0,
+    "min_time_separation_sec": 0.5,
+    "crop_margin": 0.05
+  },
+  "association": {
+    "max_time_gap_sec": 12.0,
+    "max_floor_distance": 120.0,
+    "max_appearance_distance": 0.45,
+    "appearance_weight": 0.65,
+    "spatial_weight": 0.25,
+    "temporal_weight": 0.1,
+    "synchronization_tolerance_sec": 0.35,
+    "min_synchronized_samples": 3,
+    "max_synchronized_samples": 25,
+    "allow_same_camera_nonoverlap": true,
+    "same_camera_max_time_gap_sec": 3.0,
+    "same_camera_max_floor_distance": 80.0,
+    "same_camera_max_appearance_distance": 0.25,
+    "require_same_employee_label": true,
+    "max_assignment_score": 0.78,
+    "assignment_window_sec": 5.0,
+    "overlap_tolerance_sec": 0.0,
+    "allowed_camera_pairs": null
+  },
+  "execution": {
+    "require_fresh_per_camera_tracking_manifest": true,
+    "reuse_embedding_cache": true,
+    "render_global_videos": true
+  }
+}

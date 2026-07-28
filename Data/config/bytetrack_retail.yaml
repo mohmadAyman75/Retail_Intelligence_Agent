@@ -1,0 +1,10 @@
+# Retail-oriented ByteTrack settings.
+# YOLO receives detections down to track_low_thresh so ByteTrack can preserve
+# identity through short occlusions. Only detections >= 0.25 are saved later.
+tracker_type: bytetrack
+track_high_thresh: 0.25
+track_low_thresh: 0.10
+new_track_thresh: 0.25
+track_buffer: 30
+match_thresh: 0.80
+fuse_score: true

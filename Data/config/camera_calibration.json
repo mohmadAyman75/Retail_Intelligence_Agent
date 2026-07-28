@@ -1,0 +1,6 @@
+{
+  "camera_01": {
+    "homography": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+    "note": "Replace this identity matrix with your camera-to-floor homography before using multi-camera fusion."
+  }
+}

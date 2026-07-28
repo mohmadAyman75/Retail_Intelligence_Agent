@@ -1,0 +1,31 @@
+# Python and Jupyter runtime files
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+
+# Input video and generated video
+Data/raw/
+Output/videos/
+
+# Large model weights and runtime caches
+*.pt
+*.pth
+*.onnx
+Output/cache/
+
+# Generated pipeline artifacts
+Output/tables/*.csv
+Output/tables/*.json
+Output/database/
+Output/alerts/
+
+# Local application and editor files
+.streamlit/
+.env
+.env.*
+.vscode/
+.idea/
+
+# Superseded planning document; README.md is the public source of truth.
+Retail_Intelligence_Agent.md

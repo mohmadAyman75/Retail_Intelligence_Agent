@@ -1,0 +1,432 @@
+{
+  "CAFE_place_05_camera_17_15min": {
+    "homography": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "reference_camera": true,
+    "reference_camera_id": "CAFE_place_05_camera_17_15min",
+    "floor_units": "reference_pixels",
+    "mapping_direction": "identity_reference_pixels",
+    "calibration_method": "explicit_reference_identity",
+    "source_video": "Data/raw/CAFE_place_05_camera_17_15min.mp4",
+    "source_frame_index": 1500,
+    "source_timestamp_sec": 300.0,
+    "generated_at_utc": "2026-07-27T16:21:55.825038Z",
+    "validation": {
+      "status": "valid_reference_identity",
+      "condition_number": 1.0,
+      "matrix_rank": 3,
+      "determinant": 1.0
+    }
+  },
+  "CAFE_place_05_camera_18_15min": {
+    "homography": [
+      [
+        -1.21550382140452,
+        -1.9372140658143866,
+        1486.0182970782105
+      ],
+      [
+        -0.18386424988660435,
+        -0.42717278727272506,
+        217.88720961000112
+      ],
+      [
+        -0.00112057943751424,
+        -0.001126838292224528,
+        1.0
+      ]
+    ],
+    "reference_camera": false,
+    "reference_camera_id": "CAFE_place_05_camera_17_15min",
+    "floor_units": "reference_pixels",
+    "mapping_direction": "CAFE_place_05_camera_18_15min_pixels_to_CAFE_place_05_camera_17_15min_pixels",
+    "calibration_method": "opencv_findHomography_RANSAC",
+    "source_video": "Data/raw/CAFE_place_05_camera_18_15min.mp4",
+    "source_frame_index": 1500,
+    "source_timestamp_sec": 300.0,
+    "reference_frame_index": 1500,
+    "reference_timestamp_sec": 300.0,
+    "generated_at_utc": "2026-07-27T16:21:55.825038Z",
+    "landmarks": [
+      {
+        "name": "cam18_shared_ground_01",
+        "source_point": [
+          368.64,
+          678.0342857142857
+        ],
+        "reference_point": [
+          1555.7485714285713,
+          787.7485714285714
+        ],
+        "inlier": true,
+        "reprojection_error_px": 0.00012461761139945197
+      },
+      {
+        "name": "cam18_shared_ground_02",
+        "source_point": [
+          1851.9771428571428,
+          212.84571428571428
+        ],
+        "reference_point": [
+          895.2685714285714,
+          162.37714285714284
+        ],
+        "inlier": true,
+        "reprojection_error_px": 2.5578870361200532e-05
+      },
+      {
+        "name": "cam18_shared_ground_03",
+        "source_point": [
+          1112.502857142857,
+          114.10285714285713
+        ],
+        "reference_point": [
+          232.59428571428572,
+          94.35428571428571
+        ],
+        "inlier": true,
+        "reprojection_error_px": 0.0001142036000059105
+      },
+      {
+        "name": "cam18_shared_ground_04",
+        "source_point": [
+          412.5257142857143,
+          563.9314285714286
+        ],
+        "reference_point": [
+          1103.7257142857143,
+          1011.5657142857142
+        ],
+        "inlier": true,
+        "reprojection_error_px": 0.00040650484939752836
+      },
+      {
+        "name": "cam18_shared_ground_05",
+        "source_point": [
+          956.7085714285714,
+          533.2114285714285
+        ],
+        "reference_point": [
+          719.7257142857143,
+          588.0685714285714
+        ],
+        "inlier": false,
+        "reprojection_error_px": 457.84481082114337
+      },
+      {
+        "name": "cam18_shared_ground_06",
+        "source_point": [
+          787.7485714285714,
+          445.44
+        ],
+        "reference_point": [
+          625.3714285714285,
+          539.7942857142857
+        ],
+        "inlier": false,
+        "reprojection_error_px": 338.75601483876574
+      }
+    ],
+    "validation": {
+      "status": "valid",
+      "point_count": 6,
+      "inlier_count": 4,
+      "inlier_ratio": 0.6666666666666666,
+      "mean_inlier_reprojection_error_px": 0.00016772623279102283,
+      "median_inlier_reprojection_error_px": 0.00011941060570268123,
+      "max_inlier_reprojection_error_px": 0.00040650484939752836,
+      "mean_all_reprojection_error_px": 132.76691609414004,
+      "condition_number": 4855103.828094177,
+      "matrix_rank": 3,
+      "determinant": -0.06584682090846156,
+      "source_convex_hull_area_px2": 304666.9653661039,
+      "reference_convex_hull_area_px2": 503420.81864612526,
+      "validation_errors": [],
+      "thresholds": {
+        "ransac_reprojection_threshold_px": 6.0,
+        "minimum_inlier_ratio": 0.6,
+        "maximum_mean_inlier_error_px": 5.0,
+        "maximum_condition_number": 10000000000.0
+      }
+    }
+  },
+  "CAFE_place_05_camera_19_15min": {
+    "homography": [
+      [
+        1.0152360673884346,
+        -3.055326267750822,
+        1012.4800837613681
+      ],
+      [
+        0.502718523813929,
+        -0.9021912337737494,
+        221.53338650440344
+      ],
+      [
+        0.0002771503008789895,
+        -0.0013863316679089373,
+        1.0
+      ]
+    ],
+    "reference_camera": false,
+    "reference_camera_id": "CAFE_place_05_camera_17_15min",
+    "floor_units": "reference_pixels",
+    "mapping_direction": "CAFE_place_05_camera_19_15min_pixels_to_CAFE_place_05_camera_17_15min_pixels",
+    "calibration_method": "opencv_findHomography_RANSAC",
+    "source_video": "Data/raw/CAFE_place_05_camera_19_15min.mp4",
+    "source_frame_index": 1500,
+    "source_timestamp_sec": 300.0,
+    "reference_frame_index": 1500,
+    "reference_timestamp_sec": 300.0,
+    "generated_at_utc": "2026-07-27T16:21:55.825038Z",
+    "landmarks": [
+      {
+        "name": "cam19_shared_ground_01",
+        "source_point": [
+          1814.6742857142856,
+          603.4285714285714
+        ],
+        "reference_point": [
+          1099.337142857143,
+          1018.1485714285714
+        ],
+        "inlier": false,
+        "reprojection_error_px": 438.8568176961131
+      },
+      {
+        "name": "cam19_shared_ground_02",
+        "source_point": [
+          522.24,
+          116.29714285714286
+        ],
+        "reference_point": [
+          890.88,
+          166.76571428571427
+        ],
+        "inlier": false,
+        "reprojection_error_px": 384.63143903588787
+      },
+      {
+        "name": "cam19_shared_ground_03",
+        "source_point": [
+          1237.577142857143,
+          631.9542857142857
+        ],
+        "reference_point": [
+          724.1142857142856,
+          585.8742857142856
+        ],
+        "inlier": true,
+        "reprojection_error_px": 4.780975336552597e-05
+      },
+      {
+        "name": "cam19_shared_ground_04",
+        "source_point": [
+          1002.7885714285713,
+          460.79999999999995
+        ],
+        "reference_point": [
+          974.2628571428571,
+          484.9371428571428
+        ],
+        "inlier": true,
+        "reprojection_error_px": 2.0937617946062287e-05
+      },
+      {
+        "name": "cam19_shared_ground_05",
+        "source_point": [
+          414.71999999999997,
+          272.09142857142854
+        ],
+        "reference_point": [
+          816.2742857142857,
+          250.14857142857142
+        ],
+        "inlier": true,
+        "reprojection_error_px": 1.126515493888537e-05
+      },
+      {
+        "name": "cam19_shared_ground_06",
+        "source_point": [
+          1645.7142857142856,
+          480.5485714285714
+        ],
+        "reference_point": [
+          1538.1942857142856,
+          778.9714285714285
+        ],
+        "inlier": true,
+        "reprojection_error_px": 0.00010644436124480519
+      }
+    ],
+    "validation": {
+      "status": "valid",
+      "point_count": 6,
+      "inlier_count": 4,
+      "inlier_ratio": 0.6666666666666666,
+      "mean_inlier_reprojection_error_px": 4.66142218738197e-05,
+      "median_inlier_reprojection_error_px": 3.437368565579413e-05,
+      "max_inlier_reprojection_error_px": 0.00010644436124480519,
+      "mean_all_reprojection_error_px": 137.24807386481476,
+      "condition_number": 1313294.0002692302,
+      "matrix_rank": 3,
+      "determinant": 0.29176971543920704,
+      "source_convex_hull_area_px2": 280693.6137275024,
+      "reference_convex_hull_area_px2": 335101.9064917723,
+      "validation_errors": [],
+      "thresholds": {
+        "ransac_reprojection_threshold_px": 6.0,
+        "minimum_inlier_ratio": 0.6,
+        "maximum_mean_inlier_error_px": 5.0,
+        "maximum_condition_number": 10000000000.0
+      }
+    }
+  },
+  "CAFE_place_05_camera_20_15min": {
+    "homography": [
+      [
+        4.48802667204757,
+        -9.636291281993373,
+        -653.1920317988142
+      ],
+      [
+        0.8790840515643851,
+        -4.189963077172325,
+        523.4525495572894
+      ],
+      [
+        0.0036725374734437877,
+        -0.011712676196902467,
+        1.0
+      ]
+    ],
+    "reference_camera": false,
+    "reference_camera_id": "CAFE_place_05_camera_17_15min",
+    "floor_units": "reference_pixels",
+    "mapping_direction": "CAFE_place_05_camera_20_15min_pixels_to_CAFE_place_05_camera_17_15min_pixels",
+    "calibration_method": "opencv_findHomography_RANSAC",
+    "source_video": "Data/raw/CAFE_place_05_camera_20_15min.mp4",
+    "source_frame_index": 1500,
+    "source_timestamp_sec": 300.0,
+    "reference_frame_index": 1500,
+    "reference_timestamp_sec": 300.0,
+    "generated_at_utc": "2026-07-27T16:21:55.825038Z",
+    "landmarks": [
+      {
+        "name": "cam20_shared_ground_01",
+        "source_point": [
+          1768.5942857142857,
+          258.92571428571426
+        ],
+        "reference_point": [
+          232.59428571428572,
+          96.54857142857142
+        ],
+        "inlier": false,
+        "reprojection_error_px": 850.0136856541965
+      },
+      {
+        "name": "cam20_shared_ground_02",
+        "source_point": [
+          789.9428571428571,
+          373.0285714285714
+        ],
+        "reference_point": [
+          1500.8914285714286,
+          737.28
+        ],
+        "inlier": true,
+        "reprojection_error_px": 0.00013402737152685602
+      },
+      {
+        "name": "cam20_shared_ground_03",
+        "source_point": [
+          175.54285714285714,
+          245.76
+        ],
+        "reference_point": [
+          1810.2857142857142,
+          285.25714285714287
+        ],
+        "inlier": true,
+        "reprojection_error_px": 7.703691024432043e-06
+      },
+      {
+        "name": "cam20_shared_ground_04",
+        "source_point": [
+          1152.0,
+          724.1142857142856
+        ],
+        "reference_point": [
+          757.0285714285714,
+          460.79999999999995
+        ],
+        "inlier": true,
+        "reprojection_error_px": 2.257264726279973e-05
+      },
+      {
+        "name": "cam20_shared_ground_05",
+        "source_point": [
+          983.04,
+          467.3828571428571
+        ],
+        "reference_point": [
+          862.3542857142857,
+          660.48
+        ],
+        "inlier": true,
+        "reprojection_error_px": 4.212392389549501e-05
+      },
+      {
+        "name": "cam20_shared_ground_06",
+        "source_point": [
+          724.1142857142856,
+          616.5942857142857
+        ],
+        "reference_point": [
+          1055.4514285714286,
+          462.9942857142857
+        ],
+        "inlier": false,
+        "reprojection_error_px": 132.6757208692351
+      }
+    ],
+    "validation": {
+      "status": "valid",
+      "point_count": 6,
+      "inlier_count": 4,
+      "inlier_ratio": 0.6666666666666666,
+      "mean_inlier_reprojection_error_px": 5.1606908427395706e-05,
+      "median_inlier_reprojection_error_px": 3.234828557914737e-05,
+      "max_inlier_reprojection_error_px": 0.00013402737152685602,
+      "mean_all_reprojection_error_px": 163.78160215851088,
+      "condition_number": 1490617.9509383026,
+      "matrix_rank": 3,
+      "determinant": -4.667768677187074,
+      "source_convex_hull_area_px2": 424439.7443593433,
+      "reference_convex_hull_area_px2": 541631.7910577487,
+      "validation_errors": [],
+      "thresholds": {
+        "ransac_reprojection_threshold_px": 6.0,
+        "minimum_inlier_ratio": 0.6,
+        "maximum_mean_inlier_error_px": 5.0,
+        "maximum_condition_number": 10000000000.0
+      }
+    }
+  }
+}

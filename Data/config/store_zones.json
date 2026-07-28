@@ -1,0 +1,5 @@
+[
+  {"zone_id": "entrance", "label_ar": "المدخل", "kind": "entrance", "polygon": [[0, 0], [300, 0], [300, 250], [0, 250]]},
+  {"zone_id": "shelves", "label_ar": "الأرفف", "kind": "sales", "polygon": [[300, 0], [900, 0], [900, 600], [300, 600]]},
+  {"zone_id": "checkout", "label_ar": "الكاشير", "kind": "queue", "polygon": [[0, 250], [300, 250], [300, 600], [0, 600]]}
+]

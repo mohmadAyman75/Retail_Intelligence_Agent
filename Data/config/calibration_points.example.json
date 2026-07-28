@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "reference_camera_id": "CAFE_place_05_camera_17_15min",
+  "floor_units": "reference_pixels",
+  "sync_frame": {
+    "frame_index": 1500
+  },
+  "cameras": {
+    "CAFE_place_05_camera_17_15min": {
+      "video": "Data/raw/CAFE_place_05_camera_17_15min.mp4",
+      "reference_camera": true
+    },
+    "CAFE_place_05_camera_18_15min": {
+      "video": "Data/raw/CAFE_place_05_camera_18_15min.mp4",
+      "reference_camera": false
+    },
+    "CAFE_place_05_camera_19_15min": {
+      "video": "Data/raw/CAFE_place_05_camera_19_15min.mp4",
+      "reference_camera": false
+    },
+    "CAFE_place_05_camera_20_15min": {
+      "video": "Data/raw/CAFE_place_05_camera_20_15min.mp4",
+      "reference_camera": false
+    }
+  },
+  "landmarks": {
+    "CAFE_place_05_camera_18_15min": [
+      {
+        "name": "cam18_shared_ground_01",
+        "description": "Rename if desired; click one stable ground or furniture-contact point visible in Cam18 and Cam17."
+      },
+      {
+        "name": "cam18_shared_ground_02",
+        "description": "Choose a second shared point far from point 01."
+      },
+      {
+        "name": "cam18_shared_ground_03",
+        "description": "Choose a third shared point that is not collinear with points 01 and 02."
+      },
+      {
+        "name": "cam18_shared_ground_04",
+        "description": "Choose a fourth shared point spread across the overlap area."
+      },
+      {
+        "name": "cam18_shared_ground_05",
+        "description": "Optional extra RANSAC point; a floor-tile corner or table-leg contact is suitable."
+      },
+      {
+        "name": "cam18_shared_ground_06",
+        "description": "Optional extra RANSAC point; avoid people and other movable objects."
+      }
+    ],
+    "CAFE_place_05_camera_19_15min": [
+      {
+        "name": "cam19_shared_ground_01",
+        "description": "Rename if desired; click one stable ground or furniture-contact point visible in Cam19 and Cam17."
+      },
+      {
+        "name": "cam19_shared_ground_02",
+        "description": "Choose a second shared point far from point 01."
+      },
+      {
+        "name": "cam19_shared_ground_03",
+        "description": "Choose a third shared point that is not collinear with points 01 and 02."
+      },
+      {
+        "name": "cam19_shared_ground_04",
+        "description": "Choose a fourth shared point spread across the overlap area."
+      },
+      {
+        "name": "cam19_shared_ground_05",
+        "description": "Optional extra RANSAC point; a floor-tile corner or table-leg contact is suitable."
+      },
+      {
+        "name": "cam19_shared_ground_06",
+        "description": "Optional extra RANSAC point; avoid people and other movable objects."
+      }
+    ],
+    "CAFE_place_05_camera_20_15min": [
+      {
+        "name": "cam20_shared_ground_01",
+        "description": "Rename if desired; click one stable ground or furniture-contact point visible in Cam20 and Cam17."
+      },
+      {
+        "name": "cam20_shared_ground_02",
+        "description": "Choose a second shared point far from point 01."
+      },
+      {
+        "name": "cam20_shared_ground_03",
+        "description": "Choose a third shared point that is not collinear with points 01 and 02."
+      },
+      {
+        "name": "cam20_shared_ground_04",
+        "description": "Choose a fourth shared point spread across the overlap area."
+      },
+      {
+        "name": "cam20_shared_ground_05",
+        "description": "Optional extra RANSAC point; a floor-tile corner or table-leg contact is suitable."
+      },
+      {
+        "name": "cam20_shared_ground_06",
+        "description": "Optional extra RANSAC point; avoid people and other movable objects."
+      }
+    ]
+  },
+  "correspondences": {}
+}
