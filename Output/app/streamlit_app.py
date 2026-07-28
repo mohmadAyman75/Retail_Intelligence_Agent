@@ -1015,6 +1015,7 @@ if selected_camera:
     tab_queue,
     tab_analytics,
     tab_alerts,
+    tab_identity,
     tab_chat,
 ) = st.tabs(
     [
@@ -1025,6 +1026,7 @@ if selected_camera:
         "Queue Analysis",
         "Analytics",
         "Alerts",
+        "Identity & Trust",
         "Query Data",
     ]
 )
@@ -1833,7 +1835,42 @@ with tab_alerts:
             hide_index=True,
         )
 
-# ══════════════════════════════ TAB 8 — CHAT ═══════════════════════════════════
+# ══════════════════════════════ TAB 8 — IDENTITY & TRUST ══════════════════════
+with tab_identity:
+    st.markdown(
+        '<div class="section-header"><h3>Identity Scope & Data Confidence</h3></div>',
+        unsafe_allow_html=True,
+    )
+    st.success(
+        "Current dashboard metrics are camera-local: a track ID represents one "
+        "person only inside one camera. The dashboard does not merge identities "
+        "or count unique people across cameras."
+    )
+    st.warning(
+        "Global Identity is intentionally kept outside the business metrics. "
+        "Appearance alone is not proof that two camera tracks are the same person."
+    )
+
+    current_col, demo_col, ready_col = st.columns(3)
+    with current_col:
+        st.markdown("#### Available now")
+        st.markdown("- Camera-local tracking\n- Zones, queues, and movement\n- Anonymous local IDs")
+    with demo_col:
+        st.markdown("#### Research demo")
+        st.markdown(
+            "`02b_Global_Identity_Demo_Mode.ipynb` creates separate Demo output "
+            "and never feeds this dashboard."
+        )
+    with ready_col:
+        st.markdown("#### Before validation")
+        st.markdown("- Two synchronized cameras\n- Reviewed calibration\n- Labeled sample\n- Precision, Recall, and IDF1")
+
+    st.caption(
+        "Use Global ID Demo for research only until it is evaluated against labeled "
+        "cross-camera examples."
+    )
+
+# ══════════════════════════════ TAB 9 — CHAT ═══════════════════════════════════
 with tab_chat:
     st.markdown(
         '<div class="section-header"><h3>Query Your Store Data</h3></div>',
