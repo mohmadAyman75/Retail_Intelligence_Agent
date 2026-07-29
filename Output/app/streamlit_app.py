@@ -391,45 +391,31 @@ def infer_store_id(camera_id: str) -> str:
     return match.group(1).lower() if match else "default_store"
 
 
-def store_key(value: object) -> str:
-    """Normalize Streamlit filter values before matching them to video names."""
-    return str(value).strip().casefold()
+def display_video_for_camera(annotated_video: Path) -> Path:
+    """Use the color-coded replay when the current run produced one."""
+    role_video = VIDEOS_DIR / f"roles_{camera_id_from_video(annotated_video)}.mp4"
+    return role_video if artifact_is_current(role_video) else annotated_video
 
 
-def list_videos(
-    prefix: str,
-    selected_store: str | None = None,
-    require_current: bool = False,
-) -> list[Path]:
+def list_annotated_videos(selected_store: str | None = None) -> list[Path]:
     if not VIDEOS_DIR.exists():
         return []
 
     videos_by_camera = {
         camera_id_from_video(video): video
-        for video in sorted(VIDEOS_DIR.glob(f"{prefix}_*.mp4"))
-        if not require_current or artifact_is_current(video)
+        for video in sorted(VIDEOS_DIR.glob("annotated_*.mp4"))
     }
 
     videos = [
         videos_by_camera[camera_id]
         for camera_id in sorted(videos_by_camera, key=str.casefold)
     ]
-    selected_store_key = store_key(selected_store) if selected_store is not None else ""
-    if selected_store_key:
+    if selected_store:
         videos = [
             v for v in videos
-            if store_key(infer_store_id(camera_id_from_video(v))) == selected_store_key
+            if infer_store_id(camera_id_from_video(v)) == selected_store.lower()
         ]
     return videos
-
-
-def list_annotated_videos(selected_store: str | None = None) -> list[Path]:
-    return list_videos("annotated", selected_store)
-
-
-def list_role_videos(selected_store: str | None = None) -> list[Path]:
-    """Return only current staff/customer overlays created by Notebook 01b."""
-    return list_videos("roles", selected_store, require_current=True)
 
 
 def extract_frame(video_path: Path, frame_index: int = 0) -> np.ndarray | None:
@@ -922,7 +908,6 @@ tracking_reference_ns = tracking_reference_mtime_ns()
     zone_transitions,
 ) = load_data(tracking_reference_ns)
 local_tracks_ready = csv_has_rows("local_tracks.csv", tracking_reference_ns)
-role_summary = read_csv("staff_customer_summary.csv", reference_mtime_ns=tracking_reference_ns)
 database_ready = artifact_is_current(DB_PATH, tracking_reference_ns)
 
 # ──────────────────────────────── HEADER ───────────────────────────────────────
@@ -1151,23 +1136,6 @@ with tab_camera:
         if not annotated_videos:
             st.info("No annotated videos for the selected store. Re-run Notebook 01.")
         else:
-            role_videos = list_role_videos(selected_store)
-            overlay_options = ["Tracking IDs"]
-            if role_videos:
-                overlay_options.insert(0, "Worker / Customer")
-            overlay_mode = st.radio(
-                "Video Overlay",
-                overlay_options,
-                horizontal=True,
-                key="video_overlay_mode",
-                help=(
-                    "Worker / Customer uses the camera-local staff-zone result from "
-                    "Notebook 01b. Tracking IDs shows the original Notebook 01 output."
-                ),
-            )
-            is_role_view = overlay_mode == "Worker / Customer"
-            available_videos = role_videos if is_role_view else annotated_videos
-
             # ── View mode selector ──
             view_mode = st.radio(
                 "View Mode",
@@ -1181,7 +1149,7 @@ with tab_camera:
             if view_mode == "Single":
                 sel_vid = st.selectbox(
                     "Camera",
-                    available_videos,
+                    annotated_videos,
                     format_func=lambda p: camera_id_from_video(p),
                     key="cam_select_single",
                 )
@@ -1191,45 +1159,28 @@ with tab_camera:
                 with col_a:
                     vid_a = st.selectbox(
                         "Camera A",
-                        available_videos,
+                        annotated_videos,
                         index=0,
                         format_func=lambda p: camera_id_from_video(p),
                         key="cam_select_dual_a",
                     )
                 with col_b:
-                    default_b = min(1, len(available_videos) - 1)
+                    default_b = min(1, len(annotated_videos) - 1)
                     vid_b = st.selectbox(
                         "Camera B",
-                        available_videos,
+                        annotated_videos,
                         index=default_b,
                         format_func=lambda p: camera_id_from_video(p),
                         key="cam_select_dual_b",
                     )
                 active_videos = [vid_a, vid_b]
             else:  # Quad
-                active_videos = available_videos[:4]
+                active_videos = annotated_videos[:4]
                 cam_names = [camera_short_name(camera_id_from_video(v)) for v in active_videos]
                 st.caption(f"Showing {len(active_videos)} cameras: {', '.join(cam_names)}")
 
-            if is_role_view:
-                active_camera_ids = {
-                    camera_id_from_video(video) for video in active_videos
-                }
-                active_roles = role_summary[
-                    role_summary["camera_id"].astype(str).isin(active_camera_ids)
-                ] if "camera_id" in role_summary.columns else pd.DataFrame()
-                staff_tracks = int(active_roles["staff_tracks"].sum()) if "staff_tracks" in active_roles else 0
-                customer_tracks = int(active_roles["customer_tracks"].sum()) if "customer_tracks" in active_roles else 0
-                role_col, customer_col = st.columns(2)
-                role_col.metric("Staff tracks", staff_tracks)
-                customer_col.metric("Customer tracks", customer_tracks)
-                st.caption(
-                    "Red marker = staff; green marker = customer. Roles use the "
-                    "configured staff area for this camera."
-                )
-                id_label_mode = "Staff/customer overlay"
-            else:
-                id_label_mode = "Local per-camera IDs"
+            active_videos = [display_video_for_camera(video) for video in active_videos]
+            id_label_mode = "Local per-camera IDs"
 
             # ── Video info from first active video ──
             vinfo = get_video_info(active_videos[0])
@@ -1410,16 +1361,10 @@ with tab_camera:
                 else:
                     st.error("Could not extract the selected frame.")
 
-            if is_role_view:
-                id_note = (
-                    "Worker/customer labels are camera-local zone decisions, not face "
-                    "recognition or a global identity across cameras."
-                )
-            else:
-                id_note = (
-                    "Each video displays local ByteTrack IDs. The same physical person may "
-                    "receive a different ID in another camera."
-                )
+            id_note = (
+                "Red marker: remained in the configured staff area for at least the "
+                "configured duration. Green marker: all other local tracks."
+            )
             st.markdown(
                 f'<div class="id-note"><strong>ID labels:</strong> {id_note}</div>',
                 unsafe_allow_html=True,
