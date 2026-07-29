@@ -380,7 +380,7 @@ def csv_has_rows(name: str, reference_mtime_ns: int | None = None) -> bool:
 
 def camera_id_from_video(video_path: Path) -> str:
     stem = video_path.stem
-    for prefix in ("annotated_", "roles_"):
+    for prefix in ("annotated_",):
         if stem.startswith(prefix):
             return stem.removeprefix(prefix)
     return stem
@@ -389,12 +389,6 @@ def camera_id_from_video(video_path: Path) -> str:
 def infer_store_id(camera_id: str) -> str:
     match = re.search(r"(place_\d+)", camera_id, flags=re.IGNORECASE)
     return match.group(1).lower() if match else "default_store"
-
-
-def display_video_for_camera(annotated_video: Path) -> Path:
-    """Use the color-coded replay when the current run produced one."""
-    role_video = VIDEOS_DIR / f"roles_{camera_id_from_video(annotated_video)}.mp4"
-    return role_video if artifact_is_current(role_video) else annotated_video
 
 
 def list_annotated_videos(selected_store: str | None = None) -> list[Path]:
@@ -1179,7 +1173,6 @@ with tab_camera:
                 cam_names = [camera_short_name(camera_id_from_video(v)) for v in active_videos]
                 st.caption(f"Showing {len(active_videos)} cameras: {', '.join(cam_names)}")
 
-            active_videos = [display_video_for_camera(video) for video in active_videos]
             id_label_mode = "Local per-camera IDs"
 
             # ── Video info from first active video ──
@@ -1362,8 +1355,8 @@ with tab_camera:
                     st.error("Could not extract the selected frame.")
 
             id_note = (
-                "Red marker: remained in the configured staff area for at least the "
-                "configured duration. Green marker: all other local tracks."
+                "Each video displays local ByteTrack IDs. The same physical person may "
+                "receive a different ID in another camera."
             )
             st.markdown(
                 f'<div class="id-note"><strong>ID labels:</strong> {id_note}</div>',
