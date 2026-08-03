@@ -13,9 +13,12 @@ sys.path.insert(0, str(PROJECT_ROOT / "Notebook"))
 
 from reid_balanced import (  # noqa: E402
     aggregate_local_components,
+    annotate_mapping_quality,
     build_local_components,
+    cluster_anchor_stages,
     color_for_identity,
     interpolate_display_rows,
+    select_anchor_staged_matches,
     select_disjoint_local_stitches,
     select_mutual_best_matches,
     synchronized_cosine_distance,
@@ -169,6 +172,107 @@ class BalancedReIDTests(unittest.TestCase):
     def test_identity_color_is_stable_across_cameras(self) -> None:
         self.assertEqual(color_for_identity("global_000133"), color_for_identity("global_000133"))
         self.assertNotEqual(color_for_identity("global_000133"), color_for_identity("global_000134"))
+
+    def test_anchor_stages_reject_wrong_late_camera_edge(self) -> None:
+        rules = [
+            {"name": "anchor_17_18", "parent_camera": "17", "target_camera": "18", "min_synchronized_samples": 3, "max_score": 0.78, "min_margin": 0.05},
+            {"name": "attach_19_to_17", "parent_camera": "17", "target_camera": "19", "min_synchronized_samples": 5, "max_score": 0.78, "min_margin": 0.05},
+            {"name": "attach_20_to_19", "parent_camera": "19", "target_camera": "20", "min_synchronized_samples": 5, "max_score": 0.78, "min_margin": 0.05},
+        ]
+        candidates = pd.DataFrame(
+            [
+                {"store_id": "s", "camera_id_a": "17", "camera_id_b": "18", "tracklet_id_a": "a17", "tracklet_id_b": "a18", "score": 0.10, "synchronized_samples": 4},
+                {"store_id": "s", "camera_id_a": "17", "camera_id_b": "19", "tracklet_id_a": "a17", "tracklet_id_b": "a19", "score": 0.12, "synchronized_samples": 6},
+                # Wrong stage edge: Cam20 tries to attach directly to Cam17.
+                {"store_id": "s", "camera_id_a": "17", "camera_id_b": "20", "tracklet_id_a": "a17", "tracklet_id_b": "wrong20", "score": 0.01, "synchronized_samples": 9},
+                {"store_id": "s", "camera_id_a": "19", "camera_id_b": "20", "tracklet_id_a": "a19", "tracklet_id_b": "a20", "score": 0.14, "synchronized_samples": 6},
+            ]
+        )
+        selected, rejected = select_anchor_staged_matches(candidates, stage_rules=rules)
+        self.assertEqual(set(selected["association_stage"]), {"anchor_17_18", "attach_19_to_17", "attach_20_to_19"})
+        self.assertTrue(rejected.empty)
+
+        tracklets = pd.DataFrame(
+            [
+                {"store_id": "s", "camera_id": camera, "local_track_id": index, "tracklet_id": tracklet, "start_sec": 1.0, "end_sec": 2.0}
+                for index, (camera, tracklet) in enumerate((("17", "a17"), ("18", "a18"), ("19", "a19"), ("20", "a20"), ("20", "wrong20")), start=1)
+            ]
+        )
+        mapping, accepted, conflicts = cluster_anchor_stages(
+            tracklets,
+            local_matches=pd.DataFrame(),
+            staged_cross_matches=selected,
+            stage_rules=rules,
+        )
+        anchor_id = mapping.loc[mapping["tracklet_id"] == "a17", "global_track_id"].iloc[0]
+        self.assertEqual(
+            mapping.loc[mapping["tracklet_id"].isin(["a18", "a19", "a20"]), "global_track_id"].tolist(),
+            [anchor_id, anchor_id, anchor_id],
+        )
+        self.assertNotEqual(
+            mapping.loc[mapping["tracklet_id"] == "wrong20", "global_track_id"].iloc[0],
+            anchor_id,
+        )
+        self.assertEqual(len(accepted), 3)
+        self.assertTrue(conflicts.empty)
+
+    def test_target_component_cannot_be_merged_twice(self) -> None:
+        rules = [
+            {"name": "attach_19_to_17", "parent_camera": "17", "target_camera": "19", "min_synchronized_samples": 0, "max_score": 0.78, "min_margin": 0.05},
+        ]
+        tracklets = pd.DataFrame(
+            [
+                {"store_id": "s", "camera_id": camera, "local_track_id": index, "tracklet_id": tracklet, "start_sec": 1.0, "end_sec": 2.0}
+                for index, (camera, tracklet) in enumerate((("17", "a17"), ("17", "b17"), ("19", "a19")), start=1)
+            ]
+        )
+        matches = pd.DataFrame(
+            [
+                {"tracklet_id_a": "a17", "tracklet_id_b": "a19", "score": 0.10, "association_stage": "attach_19_to_17", "is_cross_camera": True},
+                {"tracklet_id_a": "b17", "tracklet_id_b": "a19", "score": 0.20, "association_stage": "attach_19_to_17", "is_cross_camera": True},
+            ]
+        )
+        _, accepted, rejected = cluster_anchor_stages(
+            tracklets, local_matches=pd.DataFrame(), staged_cross_matches=matches, stage_rules=rules
+        )
+        self.assertEqual(len(accepted), 1)
+        self.assertIn("target_already_associated", set(rejected["rejection_reason"]))
+
+    def test_mapping_records_stage_and_direct_evidence(self) -> None:
+        mapping = pd.DataFrame(
+            [
+                {"camera_id": "17", "tracklet_id": "a17", "global_track_id": "global_000001"},
+                {"camera_id": "19", "tracklet_id": "a19", "global_track_id": "global_000001"},
+                {"camera_id": "20", "tracklet_id": "unmatched20", "global_track_id": "global_000002"},
+            ]
+        )
+        matches = pd.DataFrame(
+            [
+                {
+                    "tracklet_id_a": "a17",
+                    "tracklet_id_b": "a19",
+                    "is_cross_camera": True,
+                    "synchronized_samples": 6,
+                    "match_margin": 0.12,
+                    "association_stage": "attach_19_to_17",
+                    "evidence_camera_pair": "17<->19",
+                    "appearance_distance": 0.21,
+                    "floor_distance": 16.0,
+                }
+            ]
+        )
+        annotated = annotate_mapping_quality(
+            mapping, matches, pd.DataFrame(), target_camera_ids={"19", "20"}
+        )
+        self.assertEqual(
+            annotated.loc[annotated["tracklet_id"] == "unmatched20", "identity_status"].iloc[0],
+            "unmatched_target",
+        )
+        row = annotated.loc[annotated["tracklet_id"] == "a19"].iloc[0]
+        self.assertEqual(row["association_stage"], "attach_19_to_17")
+        self.assertEqual(row["evidence_camera_pair"], "17<->19")
+        self.assertEqual(row["direct_evidence_count"], 6)
+        self.assertEqual(row["spatial_distance"], 16.0)
 
 
 if __name__ == "__main__":

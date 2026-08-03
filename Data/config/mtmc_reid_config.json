@@ -7,8 +7,9 @@
     "identity_required": false
   },
   "synchronization": {
-    "verified": false,
-    "camera_time_offsets_sec": {}
+    "verified": true,
+    "camera_time_offsets_sec": {},
+    "verification_note": "Cam17-Cam20 were manually reviewed at 0, 60, 300, and 600 seconds on the shared 5 FPS / 4500-frame grid."
   },
   "reid": {
     "model_name": "osnet_ain_x1_0",
@@ -19,19 +20,22 @@
     "min_confidence": 0.25,
     "min_box_area": 1024.0,
     "min_time_separation_sec": 0.5,
-    "crop_margin": 0.05
+    "crop_margin": 0.05,
+    "embedding_views": ["full_body", "upper_body"],
+    "preserve_crop_aspect_ratio": true
   },
   "association": {
-    "identity_mode": "appearance_time",
+    "identity_mode": "hybrid_anchor_geometry",
     "max_time_gap_sec": 0.6,
     "min_temporal_overlap_sec": 0.6,
     "max_floor_distance": 120.0,
     "max_appearance_distance": 0.45,
-    "appearance_weight": 1.0,
-    "spatial_weight": 0.0,
+    "appearance_weight": 0.65,
+    "spatial_weight": 0.35,
     "temporal_weight": 0.0,
     "synchronization_tolerance_sec": 0.35,
     "min_synchronized_samples": 3,
+    "target_min_synchronized_samples": 5,
     "max_synchronized_samples": 25,
     "allow_same_camera_nonoverlap": true,
     "same_camera_max_time_gap_sec": 10.0,
@@ -45,12 +49,42 @@
     "max_assignment_score": 0.78,
     "min_match_margin": 0.05,
     "overlap_tolerance_sec": 0.0,
+    "anchor_stages": [
+      {
+        "name": "anchor_17_18",
+        "parent_camera": "CAFE_place_05_camera_17_15min",
+        "target_camera": "CAFE_place_05_camera_18_15min",
+        "min_synchronized_samples": 3,
+        "max_score": 0.78,
+        "min_margin": 0.05,
+        "mode": "appearance_time"
+      },
+      {
+        "name": "attach_19_to_17",
+        "parent_camera": "CAFE_place_05_camera_17_15min",
+        "target_camera": "CAFE_place_05_camera_19_15min",
+        "min_synchronized_samples": 5,
+        "max_score": 0.78,
+        "min_margin": 0.05,
+        "mode": "appearance_geometry_time"
+      },
+      {
+        "name": "attach_20_to_19",
+        "parent_camera": "CAFE_place_05_camera_19_15min",
+        "target_camera": "CAFE_place_05_camera_20_15min",
+        "min_synchronized_samples": 5,
+        "max_score": 0.78,
+        "min_margin": 0.05,
+        "mode": "appearance_geometry_time"
+      }
+    ],
+    "identity_calibrated_cameras": [
+      "CAFE_place_05_camera_19_15min",
+      "CAFE_place_05_camera_20_15min"
+    ],
     "allowed_camera_pairs": [
       ["CAFE_place_05_camera_17_15min", "CAFE_place_05_camera_18_15min"],
       ["CAFE_place_05_camera_17_15min", "CAFE_place_05_camera_19_15min"],
-      ["CAFE_place_05_camera_17_15min", "CAFE_place_05_camera_20_15min"],
-      ["CAFE_place_05_camera_18_15min", "CAFE_place_05_camera_19_15min"],
-      ["CAFE_place_05_camera_18_15min", "CAFE_place_05_camera_20_15min"],
       ["CAFE_place_05_camera_19_15min", "CAFE_place_05_camera_20_15min"]
     ]
   },

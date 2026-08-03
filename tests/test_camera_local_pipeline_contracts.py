@@ -53,24 +53,34 @@ class CameraLocalPipelineContractTests(unittest.TestCase):
         self.assertIn("'artifacts': artifacts", notebook_source)
         self.assertIn("validate_reid_manifest", dashboard_source)
         self.assertIn("Artifact hashes are missing", dashboard_source)
+        self.assertIn("cluster_anchor_stages", notebook_source)
+        self.assertIn("select_anchor_staged_matches", notebook_source)
+        self.assertIn("marker_blue = (255, 0, 0)", notebook_source)
+        self.assertNotIn("cv2.rectangle(frame", notebook_source)
+        self.assertIn("config_path", dashboard_source)
+        self.assertIn("calibration_path", dashboard_source)
 
-    def test_place_05_uses_all_six_camera_pairs_with_balanced_defaults(self) -> None:
+    def test_place_05_uses_staged_anchor_topology_for_cam19_and_cam20(self) -> None:
         config = json.loads(
             (PROJECT_ROOT / "Data" / "config" / "mtmc_reid_config.json").read_text(encoding="utf-8")
         )
         association = config["association"]
         allowed_pairs = {frozenset(pair) for pair in association["allowed_camera_pairs"]}
-        cameras = {
-            f"CAFE_place_05_camera_{camera_id}_15min"
-            for camera_id in (17, 18, 19, 20)
-        }
         expected_pairs = {
-            frozenset((left, right))
-            for left in cameras
-            for right in cameras
-            if left < right
+            frozenset(("CAFE_place_05_camera_17_15min", "CAFE_place_05_camera_18_15min")),
+            frozenset(("CAFE_place_05_camera_17_15min", "CAFE_place_05_camera_19_15min")),
+            frozenset(("CAFE_place_05_camera_19_15min", "CAFE_place_05_camera_20_15min")),
         }
         self.assertEqual(allowed_pairs, expected_pairs)
+        self.assertEqual(association["identity_mode"], "hybrid_anchor_geometry")
+        self.assertEqual(
+            [rule["name"] for rule in association["anchor_stages"]],
+            ["anchor_17_18", "attach_19_to_17", "attach_20_to_19"],
+        )
+        self.assertEqual(
+            association["identity_calibrated_cameras"],
+            ["CAFE_place_05_camera_19_15min", "CAFE_place_05_camera_20_15min"],
+        )
         self.assertEqual(config["reid"]["samples_per_tracklet"], 24)
         self.assertEqual(association["same_camera_max_time_gap_sec"], 10.0)
         self.assertEqual(association["min_match_margin"], 0.05)

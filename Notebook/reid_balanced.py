@@ -172,6 +172,200 @@ def select_mutual_best_matches(
     return accepted, rejected
 
 
+def _pair_key(camera_id_a: object, camera_id_b: object) -> frozenset[str]:
+    """Return an order-independent camera-pair key."""
+
+    return frozenset((str(camera_id_a), str(camera_id_b)))
+
+
+def select_anchor_staged_matches(
+    candidates: pd.DataFrame,
+    *,
+    stage_rules: Iterable[dict[str, object]],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Apply mutual-best matching separately for an explicit camera topology.
+
+    A later stage cannot compete with, or replace, a prior stage.  This is the
+    central guard against a weak Cam19/Cam20 association changing an identity
+    that was already established by the trusted Cam17/Cam18 anchor pair.
+    """
+
+    base_columns = [*candidates.columns, "association_stage", "evidence_camera_pair"]
+    accepted_columns = [*base_columns, "match_margin"]
+    rejected_columns = [*accepted_columns, "rejection_reason"]
+    accepted_frames: list[pd.DataFrame] = []
+    rejected_frames: list[pd.DataFrame] = []
+
+    for rule in stage_rules:
+        stage_name = str(rule["name"])
+        parent_camera = str(rule["parent_camera"])
+        target_camera = str(rule["target_camera"])
+        pair = _pair_key(parent_camera, target_camera)
+        pair_label = f"{parent_camera}<->{target_camera}"
+        stage_candidates = candidates.loc[
+            candidates.apply(
+                lambda row: _pair_key(row["camera_id_a"], row["camera_id_b"]) == pair,
+                axis=1,
+            )
+        ].copy()
+        if stage_candidates.empty:
+            continue
+
+        stage_candidates["association_stage"] = stage_name
+        stage_candidates["evidence_camera_pair"] = pair_label
+        min_samples = int(rule.get("min_synchronized_samples", 0))
+        if "synchronized_samples" in stage_candidates:
+            evidence = pd.to_numeric(
+                stage_candidates["synchronized_samples"], errors="coerce"
+            ).fillna(0)
+        else:
+            evidence = pd.Series(0, index=stage_candidates.index, dtype=float)
+        insufficient = stage_candidates.loc[evidence < min_samples].copy()
+        if not insufficient.empty:
+            insufficient["match_margin"] = np.nan
+            insufficient["rejection_reason"] = "insufficient_direct_evidence"
+            rejected_frames.append(insufficient[rejected_columns])
+
+        eligible = stage_candidates.loc[evidence >= min_samples].copy()
+        if eligible.empty:
+            continue
+        selected, rejected = select_mutual_best_matches(
+            eligible,
+            max_score=float(rule["max_score"]),
+            min_margin=float(rule["min_margin"]),
+        )
+        if not selected.empty:
+            accepted_frames.append(selected[accepted_columns])
+        if not rejected.empty:
+            rejected_frames.append(rejected[rejected_columns])
+
+    accepted = (
+        pd.concat(accepted_frames, ignore_index=True, sort=False)
+        if accepted_frames
+        else pd.DataFrame(columns=accepted_columns)
+    )
+    rejected = (
+        pd.concat(rejected_frames, ignore_index=True, sort=False)
+        if rejected_frames
+        else pd.DataFrame(columns=rejected_columns)
+    )
+    return accepted, rejected
+
+
+def cluster_anchor_stages(
+    tracklets: pd.DataFrame,
+    *,
+    local_matches: pd.DataFrame,
+    staged_cross_matches: pd.DataFrame,
+    stage_rules: Iterable[dict[str, object]],
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Build global IDs without allowing later camera stages to rewire anchors.
+
+    Local fragments are merged first.  Each cross-camera stage then attaches a
+    previously unassociated target component to a component containing its
+    configured parent camera.  The target cannot already contain another
+    camera, and a merged identity can never hold simultaneous tracklets from
+    the same camera.
+    """
+
+    records = {str(row["tracklet_id"]): row for row in tracklets.to_dict("records")}
+    parent = {tracklet_id: tracklet_id for tracklet_id in records}
+
+    def find(tracklet_id: str) -> str:
+        while parent[tracklet_id] != tracklet_id:
+            parent[tracklet_id] = parent[parent[tracklet_id]]
+            tracklet_id = parent[tracklet_id]
+        return tracklet_id
+
+    def members(tracklet_id: str) -> list[str]:
+        root = find(tracklet_id)
+        return [candidate for candidate in parent if find(candidate) == root]
+
+    def member_cameras(member_ids: Iterable[str]) -> set[str]:
+        return {str(records[member_id]["camera_id"]) for member_id in member_ids}
+
+    def has_overlap(left_members: list[str], right_members: list[str]) -> bool:
+        for left_id in left_members:
+            for right_id in right_members:
+                left, right = records[left_id], records[right_id]
+                if str(left["camera_id"]) != str(right["camera_id"]):
+                    continue
+                overlap = not (
+                    float(left["end_sec"]) < float(right["start_sec"])
+                    or float(right["end_sec"]) < float(left["start_sec"])
+                )
+                if overlap:
+                    return True
+        return False
+
+    accepted_rows: list[dict[str, object]] = []
+    rejected_rows: list[dict[str, object]] = []
+
+    for row in local_matches.to_dict("records"):
+        left_id, right_id = str(row["tracklet_id_a"]), str(row["tracklet_id_b"])
+        if left_id not in records or right_id not in records:
+            raise ValueError("A local match references an unknown tracklet.")
+        left_root, right_root = find(left_id), find(right_id)
+        if left_root != right_root:
+            parent[right_root] = left_root
+        accepted_rows.append(
+            {
+                **row,
+                "association_stage": "local_stitch",
+                "evidence_camera_pair": str(records[left_id]["camera_id"]),
+            }
+        )
+
+    rules_by_name = {str(rule["name"]): rule for rule in stage_rules}
+    for stage_name, rule in rules_by_name.items():
+        parent_camera = str(rule["parent_camera"])
+        target_camera = str(rule["target_camera"])
+        rows = staged_cross_matches.loc[
+            staged_cross_matches["association_stage"].astype(str) == stage_name
+        ].sort_values(["score", "tracklet_id_a", "tracklet_id_b"], kind="stable")
+        for row in rows.to_dict("records"):
+            left_id, right_id = str(row["tracklet_id_a"]), str(row["tracklet_id_b"])
+            left_members, right_members = members(left_id), members(right_id)
+            if set(left_members) == set(right_members):
+                continue
+            left_cameras, right_cameras = member_cameras(left_members), member_cameras(right_members)
+            if parent_camera in left_cameras and target_camera in right_cameras:
+                parent_members, target_members = left_members, right_members
+            elif parent_camera in right_cameras and target_camera in left_cameras:
+                parent_members, target_members = right_members, left_members
+            else:
+                rejected_rows.append({**row, "rejection_reason": "stage_parent_missing"})
+                continue
+            if member_cameras(target_members) != {target_camera}:
+                rejected_rows.append({**row, "rejection_reason": "target_already_associated"})
+                continue
+            if has_overlap(parent_members, target_members):
+                rejected_rows.append({**row, "rejection_reason": "overlapping_same_camera_tracklets"})
+                continue
+            parent[find(target_members[0])] = find(parent_members[0])
+            accepted_rows.append(row)
+
+    groups: dict[str, list[str]] = {}
+    for tracklet_id in parent:
+        groups.setdefault(find(tracklet_id), []).append(tracklet_id)
+    global_ids: dict[str, str] = {}
+    camera_counts: dict[str, int] = {}
+    for index, member_ids in enumerate(
+        sorted(groups.values(), key=lambda values: min(values)), start=1
+    ):
+        global_id = f"global_{index:06d}"
+        camera_counts[global_id] = len(member_cameras(member_ids))
+        for tracklet_id in member_ids:
+            global_ids[tracklet_id] = global_id
+
+    mapping = tracklets[["store_id", "camera_id", "local_track_id", "tracklet_id"]].copy()
+    mapping["global_track_id"] = mapping["tracklet_id"].map(global_ids)
+    mapping["is_cross_camera_identity"] = mapping["global_track_id"].map(
+        lambda global_id: camera_counts[global_id] > 1
+    )
+    return mapping, pd.DataFrame(accepted_rows), pd.DataFrame(rejected_rows)
+
+
 def select_disjoint_local_stitches(
     candidates: pd.DataFrame,
     *,
@@ -323,6 +517,8 @@ def annotate_mapping_quality(
     mapping: pd.DataFrame,
     accepted_matches: pd.DataFrame,
     rejected_matches: pd.DataFrame,
+    *,
+    target_camera_ids: Iterable[str] = (),
 ) -> pd.DataFrame:
     """Attach review-oriented confidence evidence to every mapping row."""
 
@@ -340,6 +536,10 @@ def annotate_mapping_quality(
 
     group_evidence: dict[str, list[int]] = {}
     group_margins: dict[str, list[float]] = {}
+    group_stages: dict[str, list[str]] = {}
+    group_pairs: dict[str, list[str]] = {}
+    group_appearance: dict[str, list[float]] = {}
+    group_spatial: dict[str, list[float]] = {}
     locally_stitched_groups: set[str] = set()
     if not accepted_matches.empty:
         for row in accepted_matches.to_dict("records"):
@@ -350,6 +550,17 @@ def annotate_mapping_quality(
                 group_evidence.setdefault(global_id, []).append(
                     int(row.get("synchronized_samples", 0))
                 )
+                stage = str(row.get("association_stage", "cross_camera"))
+                pair = str(row.get("evidence_camera_pair", ""))
+                group_stages.setdefault(global_id, []).append(stage)
+                if pair:
+                    group_pairs.setdefault(global_id, []).append(pair)
+                appearance = float(row.get("appearance_distance", float("nan")))
+                spatial = float(row.get("floor_distance", float("nan")))
+                if np.isfinite(appearance):
+                    group_appearance.setdefault(global_id, []).append(appearance)
+                if np.isfinite(spatial):
+                    group_spatial.setdefault(global_id, []).append(spatial)
             else:
                 locally_stitched_groups.add(global_id)
             margin = float(row.get("match_margin", float("nan")))
@@ -360,6 +571,12 @@ def annotate_mapping_quality(
     statuses = []
     evidence = []
     margins = []
+    stages = []
+    pairs = []
+    appearance_distances = []
+    spatial_distances = []
+    direct_evidence_counts = []
+    target_cameras = {str(camera_id) for camera_id in target_camera_ids}
     for row in output.to_dict("records"):
         global_id = row["global_track_id"]
         if camera_counts.get(global_id, 0) > 1:
@@ -368,15 +585,37 @@ def annotate_mapping_quality(
             status = "stitched_camera_local"
         elif str(row["tracklet_id"]) in ambiguous_tracklets:
             status = "ambiguous_rejected"
+        elif str(row["camera_id"]) in target_cameras:
+            status = "unmatched_target"
         else:
             status = "singleton"
         statuses.append(status)
         evidence.append(max(group_evidence.get(global_id, [0])))
         margins.append(min(group_margins.get(global_id, [float("nan")])))
+        stages.append(
+            ",".join(dict.fromkeys(group_stages.get(global_id, []))) or "none"
+        )
+        pairs.append(
+            ",".join(dict.fromkeys(group_pairs.get(global_id, []))) or ""
+        )
+        appearance_values = group_appearance.get(global_id, [])
+        spatial_values = group_spatial.get(global_id, [])
+        appearance_distances.append(
+            float(np.median(appearance_values)) if appearance_values else float("nan")
+        )
+        spatial_distances.append(
+            float(np.median(spatial_values)) if spatial_values else float("nan")
+        )
+        direct_evidence_counts.append(sum(group_evidence.get(global_id, [])))
 
     output["identity_status"] = statuses
     output["evidence_samples"] = evidence
     output["match_margin"] = margins
+    output["association_stage"] = stages
+    output["evidence_camera_pair"] = pairs
+    output["appearance_distance"] = appearance_distances
+    output["spatial_distance"] = spatial_distances
+    output["direct_evidence_count"] = direct_evidence_counts
     return output
 
 

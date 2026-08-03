@@ -29,6 +29,8 @@ GLOBAL_TRACKS_PATH = TABLES_DIR / "global_tracks.csv"
 REID_MAPPING_PATH = TABLES_DIR / "reid_mapping.csv"
 REID_REPORT_PATH = TABLES_DIR / "reid_report.json"
 REID_RUN_MANIFEST_PATH = TABLES_DIR / "reid_run_manifest.json"
+REID_CONFIG_PATH = PROJECT_ROOT / "Data" / "config" / "mtmc_reid_config.json"
+CALIBRATION_PATH = PROJECT_ROOT / "Data" / "config" / "camera_calibration.generated.json"
 FRESHNESS_EXEMPT_CSVS = frozenset({"local_tracks.csv", "video_metadata.csv", "global_tracks.csv", "reid_mapping.csv"})
 
 # ──────────────────────────────────── CONFIG ───────────────────────────────────
@@ -419,8 +421,12 @@ def validate_reid_manifest() -> tuple[dict | None, str | None]:
     manifest = read_reid_run_manifest()
     if not manifest:
         return None, "reid_run_manifest.json is missing or invalid."
+    if manifest.get("status") == "blocked_calibration":
+        return None, "Cam19/Cam20 calibration is not approved yet. In Notebook 02, choose eight static floor points for each required pair."
     if manifest.get("status") != "complete":
         return None, f"ReID run status is {manifest.get('status', 'unknown')!r}, not 'complete'."
+    if manifest.get("identity_mode") != "hybrid_anchor_geometry":
+        return None, "This dashboard accepts only the staged Cam17/18 anchor plus calibrated Cam19/20 ReID output. Rerun the updated Notebook 02."
     try:
         tracking_run = json.loads(LOCAL_TRACKING_RUN_PATH.read_text(encoding="utf-8"))
         if not manifest.get("tracking_run_id") or (
@@ -440,6 +446,8 @@ def validate_reid_manifest() -> tuple[dict | None, str | None]:
         report = json.loads(REID_REPORT_PATH.read_text(encoding="utf-8"))
         if report.get("tracking_run_id") != manifest.get("tracking_run_id"):
             return None, "reid_report.json does not match the completed ReID run."
+        if report.get("identity_mode") != "hybrid_anchor_geometry":
+            return None, "reid_report.json was produced by an older ReID mode. Rerun the updated Notebook 02."
         for row in outputs:
             video_path = (PROJECT_ROOT / str(row.get("path", ""))).resolve()
             if not video_path.is_relative_to(PROJECT_ROOT) or not video_path.exists() or video_path.stat().st_size == 0:
@@ -457,6 +465,8 @@ def validate_reid_manifest() -> tuple[dict | None, str | None]:
             str(manifest.get("global_tracks_path", "")).replace("\\", "/"),
             str(manifest.get("mapping_path", "")).replace("\\", "/"),
             str(manifest.get("report_path", "")).replace("\\", "/"),
+            str(manifest.get("config_path", "")).replace("\\", "/"),
+            str(manifest.get("calibration_path", "")).replace("\\", "/"),
             *(str(row.get("path", "")).replace("\\", "/") for row in outputs),
         }
         if "" in required_paths or not required_paths.issubset(artifacts_by_path):
