@@ -573,22 +573,30 @@ def extract_tracklet_embeddings(
         capture = cv2.VideoCapture(str(videos[str(camera_id)]))
         if not capture.isOpened():
             raise RuntimeError(f"Could not open raw video for {camera_id}.")
+        frame_lookup: dict[int, list[Any]] = {}
+        for row in camera_rows.itertuples(index=False):
+            frame_lookup.setdefault(int(row.frame_index), []).append(row)
+        target_frames = set(frame_lookup.keys())
+        max_target_frame = max(target_frames) if target_frames else -1
+        current_frame = 0
         try:
-            for row in camera_rows.sort_values("frame_index").itertuples(index=False):
-                capture.set(cv2.CAP_PROP_POS_FRAMES, int(row.frame_index))
+            while current_frame <= max_target_frame:
                 ok, frame = capture.read()
-                if not ok:
-                    continue
-                height, width = frame.shape[:2]
-                x1, y1 = max(0, int(math.floor(row.x1))), max(0, int(math.floor(row.y1)))
-                x2, y2 = min(width, int(math.ceil(row.x2))), min(height, int(math.ceil(row.y2)))
-                if x2 <= x1 or y2 <= y1:
-                    continue
-                crop = cv2.cvtColor(cv2.resize(frame[y1:y2, x1:x2], (128, 256)), cv2.COLOR_BGR2RGB)
-                tensor = torch.from_numpy(crop).permute(2, 0, 1).float().div(255.0)
-                tensor = (tensor - torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)) / torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-                crops_by_tracklet.setdefault(str(row.tracklet_id), []).append(tensor)
-                valid_crops += 1
+                if not ok or frame is None:
+                    break
+                if current_frame in frame_lookup:
+                    height, width = frame.shape[:2]
+                    for row in frame_lookup[current_frame]:
+                        x1, y1 = max(0, int(math.floor(row.x1))), max(0, int(math.floor(row.y1)))
+                        x2, y2 = min(width, int(math.ceil(row.x2))), min(height, int(math.ceil(row.y2)))
+                        if x2 <= x1 or y2 <= y1:
+                            continue
+                        crop = cv2.cvtColor(cv2.resize(frame[y1:y2, x1:x2], (128, 256)), cv2.COLOR_BGR2RGB)
+                        tensor = torch.from_numpy(crop).permute(2, 0, 1).float().div(255.0)
+                        tensor = (tensor - torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)) / torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+                        crops_by_tracklet.setdefault(str(row.tracklet_id), []).append(tensor)
+                        valid_crops += 1
+                current_frame += 1
         finally:
             capture.release()
     embeddings: dict[str, np.ndarray] = {}

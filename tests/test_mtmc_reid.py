@@ -8,11 +8,6 @@ import numpy as np
 import pandas as pd
 
 
-raise unittest.SkipTest(
-    "MTMC/Re-ID was intentionally removed. See test_camera_local_pipeline_contracts.py."
-)
-
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "Notebook"))
 
@@ -94,7 +89,7 @@ class MTMCReIDTests(unittest.TestCase):
         self.assertEqual(len(result.accepted_matches), 2)
         self.assertTrue((result.accepted_matches["spatial_method"] == "synchronized_median").all())
         self.assertEqual(result.mapping["global_track_id"].nunique(), 2)
-        self.assertTrue(result.mapping["is_cross_camera"].all())
+        self.assertTrue(result.accepted_matches["is_cross_camera"].all())
 
         joined = apply_global_ids(calibrated, result.mapping)
         global_sets = joined.groupby("local_track_id")["global_track_id"].first()

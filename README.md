@@ -1,5 +1,9 @@
 # Retail Intelligence Agent
 
+> **Current pipeline update (2026-08-03):** Notebook 02 owns the estimated Global ReID and Zones stage, so the active order is 00 -> 01 -> 02 -> 03 -> 04. It stitches local fragments first, compares synchronized OSNet samples across the four-camera pair set, rejects ambiguous matches, fills only the single display frame skipped by `FRAME_STRIDE=2`, and hashes every table/video referenced by the completed run manifest. The dashboard keeps analytics camera-local and labels the review overlay as estimated EID.
+>
+> `02a_Global_ReID.ipynb` is Legacy-only and writes `*_legacy` artifacts; `02b_Global_Identity_Demo_Mode.ipynb` remains an isolated demo. Neither notebook feeds the dashboard or may overwrite Notebook 02 outputs.
+
 تحويل فيديوهات كاميرات المطاعم والمتاجر إلى مؤشرات تشغيلية قابلة للمراجعة: كثافة العملاء داخل المناطق، طول الطابور، التنبيهات، ومسارات الحركة داخل كل كاميرا.
 
 > **حالة المشروع: الـpipeline الأساسي يعمل لكل كاميرا بصورة مستقلة.** لا توجد مطابقة هوية بين كاميرتين ضمن مخرجاته أو الـDashboard، ولا تُحسب أرقامه كعدد زوار فريد على مستوى المتجر. يوجد نوتبوك بحثي منفصل باسم `02b_Global_Identity_Demo_Mode.ipynb` لا يغذي هذا المسار، وكل ناتجه معلّم صراحةً بأنه Demo.

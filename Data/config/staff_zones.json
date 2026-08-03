@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "camera_id": "CAFE_place_05_camera_17_15min",
+    "zone_id": "staff_area",
+    "label_ar": "منطقة العمل",
+    "kind": "staff",
+    "polygon": [
+      [
+        1632,
+        478
+      ],
+      [
+        1634,
+        1077
+      ],
+      [
+        1919,
+        1077
+      ],
+      [
+        1869,
+        477
+      ]
+    ]
+  }
+]

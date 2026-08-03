@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -24,7 +25,11 @@ DB_PATH = PROJECT_ROOT / "Output" / "database" / "retail_intelligence.duckdb"
 ZONES_PATH = PROJECT_ROOT / "Data" / "config" / "store_zones.json"
 LOCAL_TRACKING_RUN_PATH = TABLES_DIR / "local_tracking_run.json"
 LOCAL_TRACKS_PATH = TABLES_DIR / "local_tracks.csv"
-FRESHNESS_EXEMPT_CSVS = frozenset({"local_tracks.csv", "video_metadata.csv"})
+GLOBAL_TRACKS_PATH = TABLES_DIR / "global_tracks.csv"
+REID_MAPPING_PATH = TABLES_DIR / "reid_mapping.csv"
+REID_REPORT_PATH = TABLES_DIR / "reid_report.json"
+REID_RUN_MANIFEST_PATH = TABLES_DIR / "reid_run_manifest.json"
+FRESHNESS_EXEMPT_CSVS = frozenset({"local_tracks.csv", "video_metadata.csv", "global_tracks.csv", "reid_mapping.csv"})
 
 # ──────────────────────────────────── CONFIG ───────────────────────────────────
 st.set_page_config(
@@ -380,7 +385,7 @@ def csv_has_rows(name: str, reference_mtime_ns: int | None = None) -> bool:
 
 def camera_id_from_video(video_path: Path) -> str:
     stem = video_path.stem
-    for prefix in ("annotated_",):
+    for prefix in ("global_annotated_", "annotated_", "roles_"):
         if stem.startswith(prefix):
             return stem.removeprefix(prefix)
     return stem
@@ -391,6 +396,99 @@ def infer_store_id(camera_id: str) -> str:
     return match.group(1).lower() if match else "default_store"
 
 
+def read_reid_run_manifest() -> dict | None:
+    try:
+        return json.loads(REID_RUN_MANIFEST_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
+@st.cache_data(show_spinner=False)
+def cached_sha256(path_text: str, size_bytes: int, mtime_ns: int) -> str:
+    """Hash an immutable artifact once per size/mtime combination."""
+    del size_bytes, mtime_ns
+    digest = hashlib.sha256()
+    with Path(path_text).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_reid_manifest() -> tuple[dict | None, str | None]:
+    """Return a completed current-run manifest or a user-facing rejection reason."""
+    manifest = read_reid_run_manifest()
+    if not manifest:
+        return None, "reid_run_manifest.json is missing or invalid."
+    if manifest.get("status") != "complete":
+        return None, f"ReID run status is {manifest.get('status', 'unknown')!r}, not 'complete'."
+    try:
+        tracking_run = json.loads(LOCAL_TRACKING_RUN_PATH.read_text(encoding="utf-8"))
+        if not manifest.get("tracking_run_id") or (
+            manifest.get("tracking_run_id") != tracking_run.get("tracking_run_id")
+        ):
+            return None, "ReID artifacts belong to a different Notebook 01 tracking run."
+        camera_ids = {str(camera_id) for camera_id in manifest.get("camera_ids", [])}
+        outputs = manifest.get("video_outputs", [])
+        if not isinstance(outputs, list) or not all(
+            isinstance(row, dict) for row in outputs
+        ):
+            return None, "ReID video_outputs is malformed."
+        if not camera_ids or {str(row.get("camera_id")) for row in outputs} != camera_ids:
+            return None, "ReID video outputs do not cover the exact tracked camera set."
+        if not all(path.exists() and path.stat().st_size > 0 for path in (GLOBAL_TRACKS_PATH, REID_MAPPING_PATH)):
+            return None, "global_tracks.csv or reid_mapping.csv is missing or empty."
+        report = json.loads(REID_REPORT_PATH.read_text(encoding="utf-8"))
+        if report.get("tracking_run_id") != manifest.get("tracking_run_id"):
+            return None, "reid_report.json does not match the completed ReID run."
+        for row in outputs:
+            video_path = (PROJECT_ROOT / str(row.get("path", ""))).resolve()
+            if not video_path.is_relative_to(PROJECT_ROOT) or not video_path.exists() or video_path.stat().st_size == 0:
+                return None, f"A rendered ReID video is missing or unsafe: {row.get('path', '')}"
+
+        artifacts = manifest.get("artifacts")
+        if not isinstance(artifacts, list) or not artifacts:
+            return None, "Artifact hashes are missing. Rerun the updated Notebook 02."
+        artifacts_by_path = {
+            str(row.get("path", "")).replace("\\", "/"): row
+            for row in artifacts
+            if isinstance(row, dict)
+        }
+        required_paths = {
+            str(manifest.get("global_tracks_path", "")).replace("\\", "/"),
+            str(manifest.get("mapping_path", "")).replace("\\", "/"),
+            str(manifest.get("report_path", "")).replace("\\", "/"),
+            *(str(row.get("path", "")).replace("\\", "/") for row in outputs),
+        }
+        if "" in required_paths or not required_paths.issubset(artifacts_by_path):
+            return None, "The ReID manifest does not hash every required table and video."
+        for relative_path in sorted(required_paths):
+            artifact = artifacts_by_path[relative_path]
+            artifact_path = (PROJECT_ROOT / relative_path).resolve()
+            if not artifact_path.is_relative_to(PROJECT_ROOT) or not artifact_path.exists():
+                return None, f"Hashed ReID artifact is missing or unsafe: {relative_path}"
+            stat = artifact_path.stat()
+            if int(artifact.get("size_bytes", -1)) != int(stat.st_size):
+                return None, f"ReID artifact size changed after the manifest was written: {relative_path}"
+            expected_hash = str(artifact.get("sha256", ""))
+            actual_hash = cached_sha256(str(artifact_path), int(stat.st_size), int(stat.st_mtime_ns))
+            if not expected_hash or actual_hash != expected_hash:
+                return None, f"ReID artifact hash mismatch: {relative_path}"
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
+        return None, f"ReID integrity check failed: {type(error).__name__}: {error}"
+    return manifest, None
+
+
+def completed_reid_manifest() -> dict | None:
+    """Return a ReID result only when it belongs to the current local run."""
+    manifest, _ = validate_reid_manifest()
+    return manifest
+
+
+def reid_manifest_failure_reason() -> str | None:
+    _, reason = validate_reid_manifest()
+    return reason
+
+
 def list_annotated_videos(selected_store: str | None = None) -> list[Path]:
     if not VIDEOS_DIR.exists():
         return []
@@ -399,6 +497,12 @@ def list_annotated_videos(selected_store: str | None = None) -> list[Path]:
         camera_id_from_video(video): video
         for video in sorted(VIDEOS_DIR.glob("annotated_*.mp4"))
     }
+    # Global labels are valid only after a complete ReID manifest for this exact tracking run.
+    reid_manifest = completed_reid_manifest()
+    if reid_manifest:
+        for row in reid_manifest["video_outputs"]:
+            video = PROJECT_ROOT / str(row["path"])
+            videos_by_camera[str(row["camera_id"])] = video
 
     videos = [
         videos_by_camera[camera_id]
@@ -969,7 +1073,14 @@ with st.sidebar:
     st.markdown(f"**Annotated videos:** {n_videos}")
     st.markdown(f"**Local model:** `{OLLAMA_MODEL}`")
 
-    st.markdown("**Identity scope:** Local IDs inside each camera only")
+    has_reid = completed_reid_manifest() is not None
+    if has_reid:
+        st.markdown("**Identity scope:** Estimated MTMC ReID (Cross-camera review)")
+    else:
+        st.markdown("**Identity scope:** Local IDs inside each camera only")
+        reid_reason = reid_manifest_failure_reason()
+        if reid_reason:
+            st.caption(f"ReID inactive: {reid_reason}")
 
     st.markdown("---")
 
@@ -1173,7 +1284,8 @@ with tab_camera:
                 cam_names = [camera_short_name(camera_id_from_video(v)) for v in active_videos]
                 st.caption(f"Showing {len(active_videos)} cameras: {', '.join(cam_names)}")
 
-            id_label_mode = "Local per-camera IDs"
+            has_reid = completed_reid_manifest() is not None
+            id_label_mode = "Estimated MTMC ReID IDs Active" if has_reid else "Local per-camera IDs"
 
             # ── Video info from first active video ──
             vinfo = get_video_info(active_videos[0])
@@ -1205,27 +1317,33 @@ with tab_camera:
             )
             st.markdown("", unsafe_allow_html=True)
 
+            if total_frames <= 0:
+                st.warning("Unable to read video frames from active videos.")
+                st.stop()
+
             # ── Session state ──
             if "frame_idx" not in st.session_state:
                 st.session_state.frame_idx = 0
             if "playing" not in st.session_state:
                 st.session_state.playing = False
 
-            # Clamp after a camera switch
+            # Clamp frame index safely
+            max_slider_frame = max(1, total_frames - 1)
             if st.session_state.frame_idx >= total_frames:
                 st.session_state.frame_idx = 0
 
             # ── Controls row: slider + speed ──
             ctrl_col1, ctrl_col2 = st.columns([5, 1])
             with ctrl_col1:
+                slider_val = max(0, min(st.session_state.frame_idx, max_slider_frame))
                 frame_idx = st.slider(
                     "Frame",
                     0,
-                    max(0, total_frames - 1),
-                    st.session_state.frame_idx,
+                    max_slider_frame,
+                    slider_val,
                     key="frame_slider",
                 )
-                st.session_state.frame_idx = frame_idx
+                st.session_state.frame_idx = min(frame_idx, total_frames - 1)
             with ctrl_col2:
                 speed_options = {
                     "0.25×": 0.25,
@@ -1354,10 +1472,16 @@ with tab_camera:
                 else:
                     st.error("Could not extract the selected frame.")
 
-            id_note = (
-                "Each video displays local ByteTrack IDs. The same physical person may "
-                "receive a different ID in another camera."
-            )
+            if has_reid:
+                id_note = (
+                    "Estimated Multi-Camera ReID is active. EID labels attempt to unify "
+                    "the same person across views; retail analytics remains camera-local."
+                )
+            else:
+                id_note = (
+                    "Each video displays local ByteTrack IDs. The same physical person may "
+                    "receive a different ID in another camera."
+                )
             st.markdown(
                 f'<div class="id-note"><strong>ID labels:</strong> {id_note}</div>',
                 unsafe_allow_html=True,
@@ -1838,37 +1962,66 @@ with tab_alerts:
 # ══════════════════════════════ TAB 8 — IDENTITY & TRUST ══════════════════════
 with tab_identity:
     st.markdown(
-        '<div class="section-header"><h3>Identity Scope & Data Confidence</h3></div>',
+        '<div class="section-header"><h3>Identity Scope & MTMC Re-ID Status</h3></div>',
         unsafe_allow_html=True,
     )
-    st.success(
-        "Current dashboard metrics are camera-local: a track ID represents one "
-        "person only inside one camera. The dashboard does not merge identities "
-        "or count unique people across cameras."
-    )
-    st.warning(
-        "Global Identity is intentionally kept outside the business metrics. "
-        "Appearance alone is not proof that two camera tracks are the same person."
-    )
+    reid_report_file = TABLES_DIR / "reid_report.json"
+    reid_mapping_file = TABLES_DIR / "reid_mapping.csv"
 
-    current_col, demo_col, ready_col = st.columns(3)
-    with current_col:
-        st.markdown("#### Available now")
-        st.markdown("- Camera-local tracking\n- Zones, queues, and movement\n- Anonymous local IDs")
-    with demo_col:
-        st.markdown("#### Research demo")
-        st.markdown(
-            "`02b_Global_Identity_Demo_Mode.ipynb` creates separate Demo output "
-            "and never feeds this dashboard."
+    if completed_reid_manifest() is not None:
+        st.success(
+            "✓ Estimated Multi-Camera Re-Identification is active for visual review. "
+            "Local fragments are stitched in camera pixels, then camera pairs are matched using "
+            "synchronized OSNet samples plus mutual-best ambiguity rejection."
         )
-    with ready_col:
-        st.markdown("#### Before validation")
-        st.markdown("- Two synchronized cameras\n- Reviewed calibration\n- Labeled sample\n- Precision, Recall, and IDF1")
 
-    st.caption(
-        "Use Global ID Demo for research only until it is evaluated against labeled "
-        "cross-camera examples."
-    )
+        if reid_report_file.exists():
+            try:
+                report = json.loads(reid_report_file.read_text(encoding="utf-8"))
+                col1, col2, col3, col4 = st.columns(4)
+                col1.markdown(
+                    metric_card_html("📷", str(report.get("cameras", "—")), "Cameras Processed", "blue"),
+                    unsafe_allow_html=True,
+                )
+                col2.markdown(
+                    metric_card_html("👤", f"{report.get('total_tracklets', 0):,}", "Local Tracklets", "purple"),
+                    unsafe_allow_html=True,
+                )
+                col3.markdown(
+                    metric_card_html("🆔", f"{report.get('global_identities', 0):,}", "Global Identities", "green"),
+                    unsafe_allow_html=True,
+                )
+                merged_count = report.get("total_tracklets", 0) - report.get("global_identities", 0)
+                col4.markdown(
+                    metric_card_html("🔗", f"{max(0, merged_count):,}", "Cross-Camera Merges", "orange"),
+                    unsafe_allow_html=True,
+                )
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                with st.expander("Re-ID Pipeline Details"):
+                    st.json(report)
+            except Exception:
+                pass
+
+        if reid_mapping_file.exists():
+            try:
+                mapping = pd.read_csv(reid_mapping_file)
+                st.markdown("#### Tracklet to Global Identity Mapping")
+                st.dataframe(mapping, use_container_width=True, hide_index=True)
+            except Exception:
+                pass
+    else:
+        st.info(
+            "Current dashboard metrics are camera-local: a track ID represents one "
+            "person only inside one camera."
+        )
+        reid_reason = reid_manifest_failure_reason()
+        if reid_reason:
+            st.error(f"ReID integrity check: {reid_reason}")
+        st.warning(
+            "To enable Cross-Camera Re-ID, run Notebook 01, then the merged Notebook 02. "
+            "Global labels appear only after calibration and all ReID videos complete."
+        )
 
 # ══════════════════════════════ TAB 9 — CHAT ═══════════════════════════════════
 with tab_chat:
